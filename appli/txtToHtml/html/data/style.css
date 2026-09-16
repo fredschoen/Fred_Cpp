@@ -23,6 +23,9 @@
       margin: 0.1em 0 0.1em 0;
       color: rgb(100, 0, 100);
     }
+    td.document-counter {
+      font-size: 28px;
+    }
     hr {
 	  height: 5px;
 	  border-width:0;

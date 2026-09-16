@@ -4,6 +4,8 @@
 #include <regex>
 #include <windows.h> // Pour SetConsoleOutputCP et SetConsoleCP
 #include <filesystem>
+#include <vector>
+#include <algorithm>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -81,7 +83,10 @@ return sRetour;
 
 
 
-void transcodeToHTML(const std::string& inputFilePath, const std::string& outputFilePath, const std::string& pageLib) {
+void transcodeToHTML(const std::string& inputFilePath, const std::string& outputFilePath,
+                    const std::string& pageLib, const std::string& previousPageRef,
+                    const std::string& nextPageRef, size_t documentNumber,
+                    size_t documentCount) {
     std::ifstream inFile(inputFilePath);
     std::ofstream outFile(outputFilePath);
 
@@ -109,12 +114,25 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
 	// Envelopper le <h1> dans la structure de tableau
 	outFile << "<table style=\"width: 100%; border-collapse: collapse; margin-bottom: 1em;\">\n";
 	outFile << "  <tr>\n";
-	outFile << "    <td style=\"width: 80%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "    <td style=\"width: 80%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
 	outFile << "      <h1>" << pageLib << "</h1>\n";
 	outFile << "    </td>\n";
-	outFile << "    <td style=\"width: 20%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-	outFile << "      <a href=\"index.html\" style=\"display: inline-block;\">\n";
+    outFile << "    <td class=\"document-counter\" style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      " << documentNumber << "/" << documentCount << "\n";
+    outFile << "    </td>\n";
+    outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
+	outFile << "      </a>\n";
+	outFile << "    </td>\n";
+	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"index.html\" style=\"display: inline-block;\">\n";
+	outFile << "        <img src=\"../home.svg\" alt=\"Accueil\" style=\"width: 32px; height: 32px;\">\n";
+	outFile << "      </a>\n";
+	outFile << "    </td>\n";
+	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
+	outFile << "        <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
 	outFile << "      </a>\n";
 	outFile << "    </td>\n";
 	outFile << "  </tr>\n";
@@ -197,9 +215,22 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
     // Fin du document HTML
     outFile << "          <table style=\"width: 100%; border-collapse: collapse; margin-bottom: 1em;\">\n";
     outFile << "            <tr>\n";
-    outFile << "              <td style=\"width: 20%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "              <td style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "                <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
+    outFile << "                  <img src=\"../left-arrow.svg\" alt=\"Précédent\" style=\"width: 32px; height: 32px;\">\n";
+    outFile << "                </a>\n";
+    outFile << "              </td>\n";
+    outFile << "              <td class=\"document-counter\" style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+	outFile << "                " << documentNumber << "/" << documentCount << "\n";
+	outFile << "              </td>\n";
+    outFile << "              <td style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
     outFile << "                <a href=\"index.html\" style=\"display: inline-block;\">\n";
-    outFile << "                  <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
+    outFile << "                  <img src=\"../home.svg\" alt=\"Accueil\" style=\"width: 32px; height: 32px;\">\n";
+    outFile << "                </a>\n";
+    outFile << "              </td>\n";
+    outFile << "              <td style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "                <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
+    outFile << "                  <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
     outFile << "                </a>\n";
     outFile << "              </td>\n";
     outFile << "            </tr>\n";
@@ -254,23 +285,41 @@ int trtDirTxt() {
 
 
 
-    std::string inputFilePath, outputFilePath;
-	std::string pageRef, pageLib, temp;
-
+    std::vector<fs::path> txtFiles;
     if (fs::exists(txtDirPath) && fs::is_directory(txtDirPath)) {
         for (const auto& entry : fs::directory_iterator(txtDirPath)) {
             if (entry.is_regular_file() && entry.path().extension() == ".txt") {
+                txtFiles.push_back(entry.path());
+            }
+        }
+        std::sort(txtFiles.begin(), txtFiles.end(), [](const fs::path& left, const fs::path& right) {
+            return left.filename().string() < right.filename().string();
+        });
+    }
+
+    std::string inputFilePath, outputFilePath;
+	std::string pageRef, pageLib, temp;
+
+    if (!txtFiles.empty()) {
+        for (size_t fileIndex = 0; fileIndex < txtFiles.size(); ++fileIndex) {
+                const auto& entry = txtFiles[fileIndex];
                 //std::cout << entry.path().filename().string() << std::endl;
-                std::cout << entry.path().string() << std::endl;
+                std::cout << entry.string() << std::endl;
 				
-				inputFilePath=entry.path().string();
-				outputFilePath=replaceString(entry.path().string(),".txt",".html");
+				inputFilePath=entry.string();
+				outputFilePath=replaceString(entry.string(),".txt",".html");
 				outputFilePath=replaceString(outputFilePath,"\\txt\\","\\html\\");
-				pageLib=replaceString(entry.path().filename().string(),".txt","");
+				pageLib=replaceString(entry.filename().string(),".txt","");
 				temp=replaceString(pageLib," ","_");
 
-				pageRef=replaceString(entry.path().filename().string(),".txt",".html");
+				pageRef=replaceString(entry.filename().string(),".txt",".html");
 				pageRef=replaceString(pageRef," ","_");
+				const size_t previousIndex = (fileIndex == 0) ? txtFiles.size() - 1 : fileIndex - 1;
+				const size_t nextIndex = (fileIndex + 1) % txtFiles.size();
+				std::string previousPageRef = replaceString(txtFiles[previousIndex].filename().string(), ".txt", ".html");
+				std::string nextPageRef = replaceString(txtFiles[nextIndex].filename().string(), ".txt", ".html");
+				previousPageRef = replaceString(previousPageRef, " ", "_");
+				nextPageRef = replaceString(nextPageRef, " ", "_");
 
 				outputFilePath=replaceString(outputFilePath,pageLib,temp);
 				pageLib=pageLib.substr(8, 99);
@@ -278,8 +327,8 @@ int trtDirTxt() {
 				indexFile << "	<p class=\"index\">\n";
 				indexFile << "		<a href=\"" << pageRef << "\">" << pageLib << "</a><br>\n";
 				indexFile << "	</p>\n";
-				transcodeToHTML(inputFilePath, outputFilePath, pageLib);				
-            }
+                transcodeToHTML(inputFilePath, outputFilePath, pageLib, previousPageRef, nextPageRef,
+                    fileIndex + 1, txtFiles.size());
         }
     } else {
         std::cerr << "Directory 'txt' does not exist." << std::endl;
