@@ -1,0 +1,46 @@
+Voici un exemple de code en C++ pour afficher le contenu du fichier texte situé à `current_path() / "txt" / "bottom.txt"` en utilisant la bibliothèque `<filesystem>` (disponible depuis C++17) et `<fstream>` pour la lecture du fichier :
+
+```cpp
+#include <iostream>
+#include <fstream>
+#include <filesystem>
+#include <string>
+
+namespace fs = std::filesystem;
+
+int main() {
+    // Construire le chemin du fichier
+    fs::path file_path = fs::current_path() / "txt" / "bottom.txt";
+
+    // Ouvrir le fichier
+    std::ifstream file(file_path);
+
+    // Vérifier si le fichier est ouvert
+    if (!file.is_open()) {
+        std::cerr << "Erreur : Impossible d'ouvrir le fichier " << file_path << std::endl;
+        return 1;
+    }
+
+    // Lire et afficher le contenu ligne par ligne
+    std::string line;
+    while (std::getline(file, line)) {
+        std::cout << line << std::endl;
+    }
+
+    // Fermer le fichier
+    file.close();
+    return 0;
+}
+```
+
+### Explications :
+1. **`fs::current_path()`** : Récupère le chemin du répertoire courant.
+2. **`/ "txt" / "bottom.txt"`** : Construit le chemin relatif vers le fichier.
+3. **`std::ifstream`** : Ouvre le fichier en mode lecture.
+4. **`std::getline`** : Lit le fichier ligne par ligne et l'affiche.
+
+### Prérequis :
+- Assure-toi que le dossier `txt` existe dans le répertoire courant et qu'il contient le fichier `bottom.txt`.
+- Compile avec un compilateur supportant C++17 (ex: `g++ -std=c++17 ton_fichier.cpp -o output`).
+
+Si tu veux tester ou adapter ce code, fais-le-moi savoir !
