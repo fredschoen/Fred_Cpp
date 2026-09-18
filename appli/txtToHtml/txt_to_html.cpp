@@ -114,22 +114,22 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
 	// Envelopper le <h1> dans la structure de tableau
 	outFile << "<table style=\"width: 100%; border-collapse: collapse; margin-bottom: 1em;\">\n";
 	outFile << "  <tr>\n";
-    outFile << "    <td style=\"width: 80%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-	outFile << "      <h1>" << pageLib << "</h1>\n";
-	outFile << "    </td>\n";
-    outFile << "    <td class=\"document-counter\" style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      " << documentNumber << "/" << documentCount << "\n";
-    outFile << "    </td>\n";
-    outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
-	outFile << "        <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
-	outFile << "      </a>\n";
-	outFile << "    </td>\n";
 	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
     outFile << "      <a href=\"index.html\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../home.svg\" alt=\"Accueil\" style=\"width: 32px; height: 32px;\">\n";
 	outFile << "      </a>\n";
 	outFile << "    </td>\n";
+    outFile << "    <td style=\"width: 80%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+	outFile << "      <h1>" << pageLib << "</h1>\n";
+	outFile << "    </td>\n";
+    outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
+	outFile << "        <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
+	outFile << "      </a>\n";
+	outFile << "    </td>\n";
+    outFile << "    <td class=\"document-counter\" style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      " << documentNumber << "/" << documentCount << "\n";
+    outFile << "    </td>\n";
 	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
     outFile << "      <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
@@ -201,10 +201,12 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
 	
 	
         if (clearedLine == "-") {
-			std::cout << "aaa clearedLine=\"" << clearedLine << "\"" << std::endl;
 			outFile << "<br>\n";			
             outFile << "<hr>\n";
 			outFile << "<br>\n";			
+
+        } else if (!clearedLine.empty() && clearedLine.front() == '#') {
+			outFile << "<h2>" << line.substr(1) << "</h2>\n";
 
         } else {
 			std::cout << "b clearedLine=\"" << clearedLine << "\"" << std::endl;
@@ -213,28 +215,30 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
     }
 
     // Fin du document HTML
-    outFile << "          <table style=\"width: 100%; border-collapse: collapse; margin-bottom: 1em;\">\n";
-    outFile << "            <tr>\n";
-    outFile << "              <td style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "                <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
-    outFile << "                  <img src=\"../left-arrow.svg\" alt=\"Précédent\" style=\"width: 32px; height: 32px;\">\n";
-    outFile << "                </a>\n";
-    outFile << "              </td>\n";
-    outFile << "              <td class=\"document-counter\" style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-	outFile << "                " << documentNumber << "/" << documentCount << "\n";
-	outFile << "              </td>\n";
-    outFile << "              <td style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "                <a href=\"index.html\" style=\"display: inline-block;\">\n";
-    outFile << "                  <img src=\"../home.svg\" alt=\"Accueil\" style=\"width: 32px; height: 32px;\">\n";
-    outFile << "                </a>\n";
-    outFile << "              </td>\n";
-    outFile << "              <td style=\"text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "                <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
-    outFile << "                  <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
-    outFile << "                </a>\n";
-    outFile << "              </td>\n";
-    outFile << "            </tr>\n";
-    outFile << "          </table>\n";
+	outFile << "<table style=\"width: 100%; border-collapse: collapse; margin-bottom: 1em;\">\n";
+	outFile << "  <tr>\n";
+	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"index.html\" style=\"display: inline-block;\">\n";
+	outFile << "        <img src=\"../home.svg\" alt=\"Accueil\" style=\"width: 32px; height: 32px;\">\n";
+	outFile << "      </a>\n";
+	outFile << "    </td>\n";
+    outFile << "    <td style=\"width: 80%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+	outFile << "    </td>\n";
+    outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
+	outFile << "        <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
+	outFile << "      </a>\n";
+	outFile << "    </td>\n";
+    outFile << "    <td class=\"document-counter\" style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      " << documentNumber << "/" << documentCount << "\n";
+    outFile << "    </td>\n";
+	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
+    outFile << "      <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
+	outFile << "        <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
+	outFile << "      </a>\n";
+	outFile << "    </td>\n";
+	outFile << "  </tr>\n";
+	outFile << "</table>\n";			
     outFile << "</body>\n</html>";
 
     inFile.close();
