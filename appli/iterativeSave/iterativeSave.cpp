@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -7,8 +9,18 @@
 #include <set>
 #include <sstream>
 #include <string>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace fs = std::filesystem;
+
+void configureConsoleEncoding() {
+#ifdef _WIN32
+    SetConsoleCP(CP_UTF8);
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+}
 
 struct FileInfo {
     fs::path path;
@@ -20,6 +32,15 @@ std::string relativeName(const fs::path& path) {
     return path.generic_string();
 }
 
+bool isDesktopIni(const fs::path& path) {
+    std::string filename = path.filename().string();
+    std::transform(filename.begin(), filename.end(), filename.begin(),
+                   [](unsigned char character) {
+                       return static_cast<char>(std::tolower(character));
+                   });
+    return filename == "desktop.ini";
+}
+
 std::map<std::string, FileInfo> listFiles(const fs::path& root) {
     std::map<std::string, FileInfo> files;
 
@@ -28,7 +49,7 @@ std::map<std::string, FileInfo> listFiles(const fs::path& root) {
     }
 
     for (const fs::directory_entry& entry : fs::recursive_directory_iterator(root)) {
-        if (!entry.is_regular_file()) {
+        if (!entry.is_regular_file() || isDesktopIni(entry.path())) {
             continue;
         }
 
@@ -75,10 +96,36 @@ std::string nowAsText() {
     return result.str();
 }
 
+std::string fileTimeAsText(const fs::file_time_type& fileTime) {
+    const auto systemTime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        fileTime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+    const std::time_t time = std::chrono::system_clock::to_time_t(systemTime);
+    std::tm localTime{};
+#ifdef _WIN32
+    localtime_s(&localTime, &time);
+#else
+    localtime_r(&time, &localTime);
+#endif
+
+    std::ostringstream result;
+    result << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S");
+    return result.str();
+}
+
+bool sameModificationTime(const fs::file_time_type& source,
+                          const fs::file_time_type& target) {
+    const auto difference = source >= target ? source - target : target - source;
+    return difference <= std::chrono::seconds(2);
+}
+
 void writeLog(std::ofstream& log, const std::string& action,
               const std::string& relativePath, bool execution) {
-    log << nowAsText() << " | " << (execution ? "EXEC" : "SIMU")
-        << " | " << action << " | " << relativePath << '\n';
+    const std::string message = nowAsText() + " | "
+        + (execution ? "EXEC" : "SIMU") + " | " + action + " | " + relativePath;
+    log << message << '\n';
+    //if (execution) {
+        std::cout << message << std::endl;
+    //}
 }
 
 bool copySourceFile(const FileInfo& source, const fs::path& target) {
@@ -115,6 +162,8 @@ bool removeTargetDirectory(const fs::path& target) {
 }
 
 int main(int argc, char* argv[]) {
+    configureConsoleEncoding();
+
     if (argc < 3 || argc > 4) {
         std::cerr << "Usage : iterativeSave <repertoire_source> <repertoire_cible> [simu|exec]\n";
         return 1;
@@ -174,6 +223,26 @@ int main(int argc, char* argv[]) {
     }
 
     int differenceCount = 0;
+
+    for (const std::string& name : sourceDirectories) {
+        if (targetDirectories.find(name) != targetDirectories.end()) {
+            continue;
+        }
+
+        differenceCount++;
+        writeLog(log, "NOUVEAU", name + "/", execution);
+        if (execution) {
+            try {
+                fs::create_directories(targetRoot / fs::path(name));
+            } catch (const fs::filesystem_error& error) {
+                std::cerr << "Erreur de creation du repertoire "
+                          << targetRoot / fs::path(name) << " : "
+                          << error.what() << '\n';
+                return 1;
+            }
+        }
+    }
+
     for (const std::string& name : allNames) {
         const auto source = sourceFiles.find(name);
         const auto target = targetFiles.find(name);
@@ -192,29 +261,25 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         } else if (source->second.size != target->second.size ||
-                   source->second.modificationTime != target->second.modificationTime) {
+                   !sameModificationTime(source->second.modificationTime,
+                                         target->second.modificationTime)) {
             differenceCount++;
-            writeLog(log, "MODIFIE", name, execution);
-            if (execution && !copySourceFile(source->second, targetPath)) {
-                return 1;
+            std::string reason;
+            if (source->second.size != target->second.size) {
+                reason = "taille " + std::to_string(source->second.size)
+                    + " / " + std::to_string(target->second.size);
             }
-        }
-    }
-
-    for (const std::string& name : sourceDirectories) {
-        if (targetDirectories.find(name) != targetDirectories.end()) {
-            continue;
-        }
-
-        differenceCount++;
-        writeLog(log, "NOUVEAU", name + "/", execution);
-        if (execution) {
-            try {
-                fs::create_directories(targetRoot / fs::path(name));
-            } catch (const fs::filesystem_error& error) {
-                std::cerr << "Erreur de creation du repertoire "
-                          << targetRoot / fs::path(name) << " : "
-                          << error.what() << '\n';
+            if (!sameModificationTime(source->second.modificationTime,
+                                      target->second.modificationTime)) {
+                if (!reason.empty()) {
+                    reason += "; ";
+                }
+                reason += "date modif "
+                    + fileTimeAsText(source->second.modificationTime)
+                    + " / " + fileTimeAsText(target->second.modificationTime);
+            }
+            writeLog(log, "MODIFIE (" + reason + ")", name, execution);
+            if (execution && !copySourceFile(source->second, targetPath)) {
                 return 1;
             }
         }

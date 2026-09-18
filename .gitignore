@@ -5,3 +5,4 @@
 *.ods
 /appli/data
 appli/iterativeSave/iterativeSave.log
+appli/iterativeSave/3*
