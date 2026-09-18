@@ -1,8 +1,6 @@
 
 *.exe
-*.vcf
 *.o
-*.csv
 /appli/zSauve
 *.ods
 /appli/data
