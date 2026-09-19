@@ -31,6 +31,15 @@ struct FileInfo {
 std::string relativeName(const fs::path& path) {
     return path.generic_string();
 }
+struct CaseInsensitiveLess {
+    bool operator()(const std::string& left, const std::string& right) const {
+        return std::lexicographical_compare(
+            left.begin(), left.end(), right.begin(), right.end(),
+            [](unsigned char leftCharacter, unsigned char rightCharacter) {
+                return std::tolower(leftCharacter) < std::tolower(rightCharacter);
+            });
+    }
+};
 
 bool isDesktopIni(const fs::path& path) {
     std::string filename = path.filename().string();
@@ -41,8 +50,11 @@ bool isDesktopIni(const fs::path& path) {
     return filename == "desktop.ini";
 }
 
-std::map<std::string, FileInfo> listFiles(const fs::path& root) {
-    std::map<std::string, FileInfo> files;
+using FileMap = std::map<std::string, FileInfo, CaseInsensitiveLess>;
+using DirectorySet = std::set<std::string, CaseInsensitiveLess>;
+
+FileMap listFiles(const fs::path& root) {
+    FileMap files;
 
     if (!fs::exists(root) || !fs::is_directory(root)) {
         return files;
@@ -64,8 +76,8 @@ std::map<std::string, FileInfo> listFiles(const fs::path& root) {
     return files;
 }
 
-std::set<std::string> listDirectories(const fs::path& root) {
-    std::set<std::string> directories;
+DirectorySet listDirectories(const fs::path& root) {
+    DirectorySet directories;
 
     if (!fs::exists(root) || !fs::is_directory(root)) {
         return directories;
@@ -86,7 +98,7 @@ std::string nowAsText() {
     const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm localTime{};
 #ifdef _WIN32
-    localtime_s(&localTime, &now);
+DirectorySet allNames;
 #else
     localtime_r(&now, &localTime);
 #endif
@@ -210,10 +222,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const std::map<std::string, FileInfo> sourceFiles = listFiles(sourceRoot);
-    const std::map<std::string, FileInfo> targetFiles = listFiles(targetRoot);
-    const std::set<std::string> sourceDirectories = listDirectories(sourceRoot);
-    const std::set<std::string> targetDirectories = listDirectories(targetRoot);
+    const FileMap sourceFiles = listFiles(sourceRoot);
+    const FileMap targetFiles = listFiles(targetRoot);
+    const DirectorySet sourceDirectories = listDirectories(sourceRoot);
+    const DirectorySet targetDirectories = listDirectories(targetRoot);
     std::set<std::string> allNames;
     for (const auto& file : sourceFiles) {
         allNames.insert(file.first);
