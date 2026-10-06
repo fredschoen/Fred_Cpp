@@ -1,0 +1,3 @@
+ViewCsv.exe a été bloqué par la stratégie Device Guard de votre organisation.
+->
+exec ok: j'ai ajouté le programme à windowsdefender://exploitprotection/

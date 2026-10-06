@@ -1,0 +1,10 @@
+
+*.exe
+*.o
+/appli/zSauve
+*.ods
+/appli/data
+appli/iterativeSave/iterativeSave.log
+appli/iterativeSave/3*
+/appli/calendar/event-prod
+/appli/parseVCard/vcard-prod

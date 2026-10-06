@@ -1,0 +1,18 @@
+Procédure recommandée : MSYS2 + MinGW-w64
+
+Téléchargez et installez MSYS2 depuis msys2.org.
+Ouvrez MSYS2 UCRT64 depuis le menu Démarrer.
+Mettez à jour MSYS2 :
+pacman -Syu	
+Fermez puis rouvrez MSYS2 UCRT64, puis exécutez à nouveau :
+pacman -Syu
+
+Installez le compilateur :
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc
+
+Ajoutez ce dossier à la variable d’environnement Windows Path :
+C:\msys64\ucrt64\bin
+
+
+Vous pourrez ensuite exécuter z1.compil.bat. 
+Le fichier z1.compil.bat produira txt_to_html.exe ou txt_to_html selon la configuration MSYS2.
