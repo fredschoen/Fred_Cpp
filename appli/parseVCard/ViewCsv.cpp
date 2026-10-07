@@ -236,6 +236,50 @@ static void supprimerLigne(std::vector<std::vector<std::string> >& lignes,
     if (numero >= lignes.size()) numero = lignes.size() - 1;
 }
 
+static bool copierLigne(const std::vector<std::vector<std::string> >& lignes,
+                         size_t numero, std::string& message) {
+    if (numero == 0 || numero >= lignes.size()) {
+        message = "Aucune ligne a copier.";
+        return false;
+    }
+    // Copier les colonnes visibles avec leur valeur complete, en Unicode.
+    std::wstring texte;
+    const std::vector<std::string>& entete = lignes.front();
+    const std::vector<std::string>& valeurs = lignes[numero];
+    for (size_t i = 0; i < entete.size(); ++i) {
+        if (entete[i].find_first_not_of(" \t\r\n") == std::string::npos) continue;
+        std::string champ = entete[i] + " : ";
+        if (i < valeurs.size()) champ += valeurs[i];
+        texte += texteConsole(champ, champ.size()) + L"\r\n";
+    }
+    HGLOBAL bloc = GlobalAlloc(GMEM_MOVEABLE, (texte.size() + 1) * sizeof(wchar_t));
+    if (!bloc) {
+        message = "Erreur : memoire insuffisante pour copier.";
+        return false;
+    }
+    wchar_t* destination = static_cast<wchar_t*>(GlobalLock(bloc));
+    if (!destination) {
+        GlobalFree(bloc);
+        message = "Erreur : impossible de preparer la copie.";
+        return false;
+    }
+    std::copy(texte.begin(), texte.end(), destination);
+    destination[texte.size()] = L'\0';
+    GlobalUnlock(bloc);
+    if (!OpenClipboard(GetConsoleWindow())) {
+        GlobalFree(bloc);
+        message = "Erreur : presse-papiers indisponible.";
+        return false;
+    }
+    const bool copie = EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, bloc) != NULL;
+    CloseClipboard();
+    // Windows devient proprietaire du bloc seulement si la copie a reussi.
+    if (!copie) GlobalFree(bloc);
+    message = copie ? "Ligne copiee dans le presse-papiers."
+                    : "Erreur : impossible de copier dans le presse-papiers.";
+    return copie;
+}
+
 static void afficher(HANDLE sortie, const std::string& fichier,
                      const std::vector<std::vector<std::string> >& lignes,
                      size_t numero, const std::string& message,
@@ -260,10 +304,11 @@ static void afficher(HANDLE sortie, const std::string& fichier,
     };
 
     ecrireLigne("Fichier : " + fichier);
-    ecrireLigne("Pg Down : suivante | Pg Up : precedente | Debut : premiere | Fin : derniere");
+    ecrireLigne("Droite : suivante | Gauche : precedente");
+    ecrireLigne("Pg Down/Pg Up : +/-10 lignes | Debut : premiere | Fin : derniere");
     ecrireLigne("Suppr : supprimer | Ctrl+S : sauver | Ctrl+C ou 99 : quitter");
-    ecrireLigne("F : rechercher | M : modifier | Echap : navigation normale");
-    if (!recherche.empty()) ecrireLigne("Recherche : " + recherche + " (Pg Down/Pg Up : resultats)");
+    ecrireLigne("C : copier | F : rechercher | M : modifier | Echap : navigation normale");
+    if (!recherche.empty()) ecrireLigne("Recherche : " + recherche + " (Droite/Gauche : +/-1, Pg Down/Pg Up : +/-10 resultats)");
     ecrireLigne("");
 
     const std::vector<std::string>& entete = lignes.front();
@@ -301,7 +346,7 @@ static void afficher(HANDLE sortie, const std::string& fichier,
     std::cout.flush();
 
     // Placer le compteur sous les colonnes, au bas de la fenetre si possible.
-    const size_t bas = std::max(nombreAffiche + lignesMessage + (recherche.empty() ? 6 : 7),
+    const size_t bas = std::max(nombreAffiche + lignesMessage + (recherche.empty() ? 7 : 8),
                                static_cast<size_t>(fenetre.Bottom));
     const COORD pied = {0, static_cast<SHORT>(std::min(bas, static_cast<size_t>(info.dwSize.Y - 1)))};
     SetConsoleCursorPosition(sortie, pied);
@@ -425,7 +470,7 @@ int main(int argc, char* argv[]) {
                     mode = NORMAL;
                     if (recherche.empty()) message = "Navigation normale.";
                     else message = trouverLigne(lignes, numero, recherche, true)
-                        ? "Recherche active. Pg Down/Pg Up : resultats." : "Aucun resultat.";
+                        ? "Recherche active. Droite/Gauche : resultats." : "Aucun resultat.";
                     redessiner();
                 } else if (mode == CHAMP) {
                     colonne = trouverChamp(lignes[0], texte);
@@ -487,6 +532,11 @@ int main(int argc, char* argv[]) {
         if (touche.wVirtualKeyCode == VK_SHIFT || touche.wVirtualKeyCode == VK_CONTROL ||
             touche.wVirtualKeyCode == VK_MENU) continue;
         neufSaisi = false;
+        if (touche.wVirtualKeyCode == 'C' && !controle) {
+            copierLigne(lignes, numero, message);
+            redessiner();
+            continue;
+        }
         if (touche.wVirtualKeyCode == 'S' && controle) {
             if (sauverCsv(fichier, brutes, message)) modifie = false;
             redessiner();
@@ -516,16 +566,25 @@ int main(int argc, char* argv[]) {
             continue;
         }
         const size_t precedent = numero;
+        const size_t pas = (touche.wVirtualKeyCode == VK_NEXT || touche.wVirtualKeyCode == VK_PRIOR) ? 10 : 1;
         bool navigation = true;
         bool trouve = true;
         switch (touche.wVirtualKeyCode) {
+            case VK_RIGHT:
             case VK_NEXT:
-                if (!recherche.empty()) trouve = trouverLigne(lignes, numero, recherche, true);
-                else if (numero + 1 < lignes.size()) ++numero;
+                if (!recherche.empty()) {
+                    for (size_t i = 0; i < pas && trouve; ++i) {
+                        trouve = trouverLigne(lignes, numero, recherche, true);
+                    }
+                } else numero += std::min(pas, lignes.size() - 1 - numero);
                 break;
+            case VK_LEFT:
             case VK_PRIOR:
-                if (!recherche.empty()) trouve = trouverLigne(lignes, numero, recherche, false);
-                else if (numero > 1) --numero;
+                if (!recherche.empty()) {
+                    for (size_t i = 0; i < pas && trouve; ++i) {
+                        trouve = trouverLigne(lignes, numero, recherche, false);
+                    }
+                } else if (numero > 1) numero -= std::min(pas, numero - 1);
                 break;
             case VK_HOME:
                 if (!recherche.empty()) {
