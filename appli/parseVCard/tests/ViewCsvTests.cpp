@@ -10,6 +10,26 @@ static void verifier(bool condition, const char* message) {
 }
 
 static void tester() {
+    HistoriqueSaisie historique;
+    std::wstring saisie = L"brouillon";
+    verifier(!historique.parcourir(saisie, true) && saisie == L"brouillon", "Historique vide modifie la saisie");
+    historique.ajouter(L"Nom");
+    historique.ajouter(L"Pr\u00E9nom");
+    verifier(historique.parcourir(saisie, true) && saisie == L"Pr\u00E9nom", "Derniere saisie Unicode non rappelee");
+    verifier(historique.parcourir(saisie, true) && saisie == L"Nom", "Saisie precedente non rappelee");
+    verifier(!historique.parcourir(saisie, true) && saisie == L"Nom", "Depassement du debut de l'historique");
+    verifier(historique.parcourir(saisie, false) && saisie == L"Pr\u00E9nom", "Saisie suivante non rappelee");
+    verifier(historique.parcourir(saisie, false) && saisie == L"brouillon", "Brouillon non restaure");
+    verifier(!historique.parcourir(saisie, false), "Depassement de la fin de l'historique");
+    historique.ajouter(L"");
+    verifier(historique.parcourir(saisie, true) && saisie.empty(), "Valeur vide non memorisee");
+    historique.recommencer();
+    saisie = L"nouvelle saisie";
+    verifier(historique.parcourir(saisie, true) && saisie.empty(), "Historique perdu entre modifications");
+    verifier(historique.parcourir(saisie, false) && saisie == L"nouvelle saisie", "Ancien brouillon conserve");
+    HistoriqueSaisie autreHistorique;
+    verifier(!autreHistorique.parcourir(saisie, true), "Historiques des champs et valeurs non independants");
+
     std::vector<std::string> brutes;
     brutes.push_back("Nom;Note;;Ville\r\n");
     brutes.push_back("Alice;\"Rencontre; lundi\";cache;Paris\r\n");

@@ -355,6 +355,35 @@ static void afficher(HANDLE sortie, const std::string& fichier,
     ecrireConsole(sortie, compteur.str(), largeur, false);
 }
 
+class HistoriqueSaisie {
+public:
+    HistoriqueSaisie() : position_(0) {}
+    void recommencer() {
+        position_ = entrees_.size();
+        brouillon_.clear();
+    }
+    void ajouter(const std::wstring& texte) {
+        entrees_.push_back(texte);
+        recommencer();
+    }
+    bool parcourir(std::wstring& saisie, bool precedent) {
+        if (precedent) {
+            if (position_ == 0) return false;
+            if (position_ == entrees_.size()) brouillon_ = saisie;
+            saisie = entrees_[--position_];
+        } else {
+            if (position_ == entrees_.size()) return false;
+            ++position_;
+            saisie = position_ == entrees_.size() ? brouillon_ : entrees_[position_];
+        }
+        return true;
+    }
+private:
+    std::vector<std::wstring> entrees_;
+    size_t position_;
+    std::wstring brouillon_;
+};
+
 class ModeConsole {
 public:
     explicit ModeConsole(HANDLE entree) : entree_(entree), actif_(false), mode_(0) {
@@ -427,13 +456,14 @@ int main(int argc, char* argv[]) {
     size_t colonne = 0;
     std::string message, recherche, nouvelleValeur;
     std::wstring saisie;
+    HistoriqueSaisie historiqueChamps, historiqueValeurs;
     const auto redessiner = [&]() {
         afficher(ecran, fichier, lignes, numero, message, recherche);
     };
     const auto actualiserSaisie = [&]() {
         if (mode == RECHERCHE) message = "Rechercher (vide : tout afficher) : ";
-        else if (mode == CHAMP) message = "Nom du champ a modifier : ";
-        else message = "Nouvelle valeur de " + lignes[0][colonne] + " : ";
+        else if (mode == CHAMP) message = "Nom du champ a modifier (Haut/Bas : historique) : ";
+        else message = "Nouvelle valeur de " + lignes[0][colonne] + " (Haut/Bas : historique) : ";
         message += versUtf8(saisie);
         redessiner();
     };
@@ -463,6 +493,7 @@ int main(int argc, char* argv[]) {
                 message = "Saisie annulee.";
                 redessiner();
             } else if (touche.wVirtualKeyCode == VK_RETURN) {
+                const std::wstring saisieValidee = saisie;
                 const std::string texte = versUtf8(saisie);
                 saisie.clear();
                 if (mode == RECHERCHE) {
@@ -475,18 +506,30 @@ int main(int argc, char* argv[]) {
                 } else if (mode == CHAMP) {
                     colonne = trouverChamp(lignes[0], texte);
                     if (colonne == lignes[0].size()) {
+                        historiqueChamps.recommencer();
                         message = "Champ inconnu ou ambigu. Saisir son intitule : ";
                         redessiner();
                     } else {
+                        historiqueChamps.ajouter(saisieValidee);
+                        historiqueValeurs.recommencer();
                         mode = VALEUR;
                         actualiserSaisie();
                     }
                 } else {
+                    historiqueValeurs.ajouter(saisieValidee);
                     nouvelleValeur = texte;
                     mode = CONFIRMER_MODIFICATION;
                     message = "Modifier " + lignes[0][colonne] + " = \"" + nouvelleValeur + "\" ? O/N (Echap : annuler)";
                     redessiner();
                 }
+            } else if ((mode == CHAMP || mode == VALEUR) &&
+                       (touche.wVirtualKeyCode == VK_UP || touche.wVirtualKeyCode == VK_DOWN)) {
+                HistoriqueSaisie& historique = mode == CHAMP ? historiqueChamps : historiqueValeurs;
+                const WORD repetitions = touche.wRepeatCount ? touche.wRepeatCount : 1;
+                for (WORD i = 0; i < repetitions; ++i) {
+                    if (!historique.parcourir(saisie, touche.wVirtualKeyCode == VK_UP)) break;
+                }
+                actualiserSaisie();
             } else if (touche.wVirtualKeyCode == VK_BACK) {
                 if (!saisie.empty()) {
                     const wchar_t dernier = saisie.back();
@@ -555,6 +598,7 @@ int main(int argc, char* argv[]) {
                 continue;
             }
             mode = touche.wVirtualKeyCode == 'F' ? RECHERCHE : CHAMP;
+            if (mode == CHAMP) historiqueChamps.recommencer();
             saisie.clear();
             actualiserSaisie();
             continue;
