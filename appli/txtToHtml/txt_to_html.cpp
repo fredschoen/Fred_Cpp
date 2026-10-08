@@ -83,10 +83,27 @@ return sRetour;
 
 
 
+// Encoder les noms de fichiers pour les chaines du script JavaScript.
+string javascriptString(const string& value) {
+    string result = "\"";
+    const char* hex = "0123456789abcdef";
+    for (unsigned char character : value) {
+        if (character == '"' || character == '\\') {
+            result += '\\';
+            result += character;
+        } else if (character < 0x20) {
+            result += "\\u00";
+            result += hex[character >> 4];
+            result += hex[character & 0x0f];
+        } else {
+            result += character;
+        }
+    }
+    return result + "\"";
+}
+
 void transcodeToHTML(const std::string& inputFilePath, const std::string& outputFilePath,
-                    const std::string& pageLib, const std::string& previousPageRef,
-                    const std::string& nextPageRef, size_t documentNumber,
-                    size_t documentCount) {
+                    const std::string& pageLib) {
     std::ifstream inFile(inputFilePath);
     std::ofstream outFile(outputFilePath);
 
@@ -107,6 +124,7 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
     outFile << "  <meta charset=\"UTF-8\" />\n";
     outFile << "  <title>" << pageLib << "</title>\n";
     outFile << "  <link href=\"data/style.css\" rel=\"stylesheet\"/>\n";
+    outFile << "  <script src=\"blog.js\" defer></script>\n";
     outFile << "</head>\n<body>\n";
 
 
@@ -123,15 +141,14 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
 	outFile << "      <h1>" << pageLib << "</h1>\n";
 	outFile << "    </td>\n";
     outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
+    outFile << "      <a class=\"previous-page\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
 	outFile << "      </a>\n";
 	outFile << "    </td>\n";
     outFile << "    <td class=\"document-counter\" style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      " << documentNumber << "/" << documentCount << "\n";
     outFile << "    </td>\n";
 	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
+    outFile << "      <a class=\"next-page\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
 	outFile << "      </a>\n";
 	outFile << "    </td>\n";
@@ -225,15 +242,14 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
     outFile << "    <td style=\"width: 80%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
 	outFile << "    </td>\n";
     outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      <a href=\"" << previousPageRef << "\" style=\"display: inline-block;\">\n";
+    outFile << "      <a class=\"previous-page\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../left-arrow.svg\" alt=\"Retour\" style=\"width: 32px; height: 32px;\">\n";
 	outFile << "      </a>\n";
 	outFile << "    </td>\n";
     outFile << "    <td class=\"document-counter\" style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      " << documentNumber << "/" << documentCount << "\n";
     outFile << "    </td>\n";
 	outFile << "    <td style=\"width: 5%; text-align: center; padding: 0.5em; border: 1px solid #ccc;\">\n";
-    outFile << "      <a href=\"" << nextPageRef << "\" style=\"display: inline-block;\">\n";
+    outFile << "      <a class=\"next-page\" style=\"display: inline-block;\">\n";
 	outFile << "        <img src=\"../right-arrow.svg\" alt=\"Suivant\" style=\"width: 32px; height: 32px;\">\n";
 	outFile << "      </a>\n";
 	outFile << "    </td>\n";
@@ -249,6 +265,15 @@ void transcodeToHTML(const std::string& inputFilePath, const std::string& output
 int trtDirTxt() {
     fs::path txtDirPath = fs::current_path() / "txt";
     fs::path htmlDirPath = fs::current_path() / "html";
+
+    fs::create_directories(htmlDirPath);
+    fs::path blogScriptPath = htmlDirPath / "blog.js";
+    std::ofstream blogScript(blogScriptPath);
+    if (!blogScript.is_open()) {
+        std::cerr << "Erreur : Impossible de creer le script : " << blogScriptPath << std::endl;
+        return 0;
+    }
+    blogScript << "const blogPages = [\n";
 
     if (fs::exists(htmlDirPath) && fs::is_directory(htmlDirPath)) {
         for (const auto& entry : fs::directory_iterator(htmlDirPath)) {
@@ -331,13 +356,35 @@ int trtDirTxt() {
 				indexFile << "	<p class=\"index\">\n";
 				indexFile << "		<a href=\"" << pageRef << "\">" << pageLib << "</a><br>\n";
 				indexFile << "	</p>\n";
-                transcodeToHTML(inputFilePath, outputFilePath, pageLib, previousPageRef, nextPageRef,
-                    fileIndex + 1, txtFiles.size());
+                blogScript << "  { pageRef: " << javascriptString(pageRef)
+                           << ", previousPageRef: " << javascriptString(previousPageRef)
+                           << ", documentNumber: " << fileIndex + 1
+                           << ", documentCount: " << txtFiles.size()
+                           << ", nextPageRef: " << javascriptString(nextPageRef) << " },\n";
+                transcodeToHTML(inputFilePath, outputFilePath, pageLib);
         }
     } else {
         std::cerr << "Directory 'txt' does not exist." << std::endl;
     }
 
+
+    blogScript << R"JS(];
+
+const pageRef = decodeURIComponent(window.location.pathname.split('/').pop());
+const blogPage = blogPages.find(page => page.pageRef === pageRef);
+if (blogPage) {
+    document.querySelectorAll('.previous-page').forEach(link => {
+        link.setAttribute('href', encodeURIComponent(blogPage.previousPageRef));
+    });
+    document.querySelectorAll('.document-counter').forEach(counter => {
+        counter.textContent = `${blogPage.documentNumber}/${blogPage.documentCount}`;
+    });
+    document.querySelectorAll('.next-page').forEach(link => {
+        link.setAttribute('href', encodeURIComponent(blogPage.nextPageRef));
+    });
+}
+)JS";
+    blogScript.close();
 
     // Fin du document index HTML, inclure eventuel bas de page
 	indexFile << bottom();
