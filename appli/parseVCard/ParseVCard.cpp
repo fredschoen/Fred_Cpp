@@ -674,7 +674,7 @@ void fCsvVersVcf(void) {
 		  ficSortie	<< "EMAIL;WORK:" << sEW<< endl;
 		  ficSortie	<< "ADR;HOME:" << sAH1 << ";" << sAH2  << ";" << sAH3  << ";" << sAH4  << ";" << sAH5  << ";" << sAH6 << ";" << sAH7 << endl;
 		  ficSortie	<< "ADR;WORK:" << sAW1 << ";" << sAW2  << ";" << sAW3  << ";" << sAW4  << ";" << sAW5  << ";" << sAW6 << ";" << sAW7 << endl;
-		  ficSortie	<< "ORG:" << sO1 << ";" << sO2<< ";" << sO2<< endl;
+		  ficSortie	<< "ORG:" << sO1 << ";" << sO2<< ";" << sO3<< endl;
 		  ficSortie	<< "TITLE:" << sTI<< endl;
 		  ficSortie	<< "NOTE:" << sNT<< endl;
 		  ficSortie	<< "END:VCARD"<< endl;
